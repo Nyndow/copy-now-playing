@@ -4,8 +4,7 @@ A GNOME Shell extension that adds a **Copy** button to GNOME's built-in media
 player notification, letting you copy the currently playing track's artist
 and title to your clipboard in one click.
 
-Works with any MPRIS-compatible player: Spotify (web or desktop), browsers,
-VLC, and more.
+Works with any MPRIS-compatible player: Spotify (web or desktop), browsers, and more.
 
 ![Copy button next to Prev/Play/Next on the media notification](screenshot.webp)
 
