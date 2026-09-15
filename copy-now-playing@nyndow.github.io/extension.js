@@ -46,6 +46,13 @@ export default class CopyNowPlayingExtension extends Extension {
             }
         };
 
+        Mpris.MediaMessage.prototype._cancelCopyReset = function () {
+            if (this._copyResetId) {
+                GLib.source_remove(this._copyResetId);
+                this._copyResetId = 0;
+            }
+        };
+
         Mpris.MediaMessage.prototype._copyTrackToClipboard = function () {
             const artists = this._player.trackArtists?.join(', ') ?? '';
             const title = this._player.trackTitle ?? '';
@@ -56,9 +63,7 @@ export default class CopyNowPlayingExtension extends Extension {
             const icon = this._copyButton.child;
             icon.icon_name = COPIED_ICON;
 
-            if (this._copyResetId)
-                GLib.source_remove(this._copyResetId);
-
+            this._cancelCopyReset();
             this._copyResetId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, RESET_DELAY_MS, () => {
                 icon.icon_name = COPY_ICON;
                 this._copyResetId = 0;
@@ -73,12 +78,10 @@ export default class CopyNowPlayingExtension extends Extension {
         this._originalUpdate = null;
 
         delete Mpris.MediaMessage?.prototype?._copyTrackToClipboard;
+        delete Mpris.MediaMessage?.prototype?._cancelCopyReset;
 
         for (const message of this._patchedMessages) {
-            if (message._copyResetId) {
-                GLib.source_remove(message._copyResetId);
-                message._copyResetId = 0;
-            }
+            message._cancelCopyReset?.();
             message._copyButton?.destroy();
             delete message._copyButton;
         }
