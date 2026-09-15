@@ -34,6 +34,7 @@ export default class CopyNowPlayingExtension extends Extension {
 
         const patchedMessages = this._patchedMessages;
         const originalUpdate = this._originalUpdate;
+        const extension = this;
 
         Mpris.MediaMessage.prototype._update = function () {
             originalUpdate.call(this);
@@ -43,13 +44,6 @@ export default class CopyNowPlayingExtension extends Extension {
                     this._copyTrackToClipboard();
                 });
                 patchedMessages.add(this);
-            }
-        };
-
-        Mpris.MediaMessage.prototype._cancelCopyReset = function () {
-            if (this._copyResetId) {
-                GLib.source_remove(this._copyResetId);
-                this._copyResetId = 0;
             }
         };
 
@@ -63,7 +57,7 @@ export default class CopyNowPlayingExtension extends Extension {
             const icon = this._copyButton.child;
             icon.icon_name = COPIED_ICON;
 
-            this._cancelCopyReset();
+            extension._cancelCopyReset(this);
             this._copyResetId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, RESET_DELAY_MS, () => {
                 icon.icon_name = COPY_ICON;
                 this._copyResetId = 0;
@@ -72,16 +66,22 @@ export default class CopyNowPlayingExtension extends Extension {
         };
     }
 
+    _cancelCopyReset(message) {
+        if (message._copyResetId) {
+            GLib.source_remove(message._copyResetId);
+            message._copyResetId = 0;
+        }
+    }
+
     disable() {
         if (this._originalUpdate)
             Mpris.MediaMessage.prototype._update = this._originalUpdate;
         this._originalUpdate = null;
 
         delete Mpris.MediaMessage?.prototype?._copyTrackToClipboard;
-        delete Mpris.MediaMessage?.prototype?._cancelCopyReset;
 
         for (const message of this._patchedMessages) {
-            message._cancelCopyReset?.();
+            this._cancelCopyReset(message);
             message._copyButton?.destroy();
             delete message._copyButton;
         }
