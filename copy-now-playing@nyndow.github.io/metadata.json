@@ -1,0 +1,7 @@
+{
+    "uuid": "copy-now-playing@nyndow.github.io",
+    "name": "Copy Now Playing",
+    "description": "Adds a Copy button next to the Prev/Play/Next controls on GNOME's media player notification, letting you copy the currently playing track's artist and title to the clipboard. Works with any MPRIS-compatible player — Spotify (web or desktop), browsers, VLC, and more.",
+    "shell-version": ["45", "46", "47"],
+    "url": "https://github.com/Nyndow/copy-now-playing"
+}
