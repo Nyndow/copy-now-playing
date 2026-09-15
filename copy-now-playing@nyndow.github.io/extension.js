@@ -72,7 +72,7 @@ export default class CopyNowPlayingExtension extends Extension {
             Mpris.MediaMessage.prototype._update = this._originalUpdate;
         this._originalUpdate = null;
 
-        delete Mpris.MediaMessage.prototype._copyTrackToClipboard;
+        delete Mpris.MediaMessage?.prototype?._copyTrackToClipboard;
 
         for (const message of this._patchedMessages) {
             if (message._copyResetId) {
