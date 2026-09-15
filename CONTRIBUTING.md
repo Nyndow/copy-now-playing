@@ -1,6 +1,8 @@
 # Contributing
 
-Open an issue before sending a non-trivial PR.
+Open an issue before sending a non-trivial PR. To submit a change: fork the
+repo, create a branch, and open a pull request against `main` — don't push
+directly to `main`.
 
 ## Dev setup
 
