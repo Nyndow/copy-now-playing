@@ -21,12 +21,21 @@ disable/re-enable the extension. Watch for errors with
 
 ## How it works
 
-`extension.js` monkey-patches `Mpris.MediaMessage.prototype._update` (from
-GNOME Shell's `js/ui/mpris.js`) to add the Copy and optional Copy Link buttons
-via the existing `addMediaControl()` helper, and reverses it in `disable()`.
-This relies on internal Shell API, not a stable public one — `enable()`
-feature-detects it and no-ops with a warning if a GNOME Shell version changes
-its shape.
+`extension.js` adds the Copy and optional Copy Link buttons to each media
+message via the Shell's own `addMediaControl()` helper, and removes them in
+`disable()`. How it gets hold of the messages depends on the Shell version:
+
+- **GNOME 45–47**: `Mpris.MediaMessage` is exported, so its `_update()` is
+  wrapped and existing messages are read from the date menu's `_mediaSection`.
+- **GNOME 48+**: `MediaMessage` moved into `messageList.js` and is no longer
+  exported, so `MessageList.MessageView.prototype._addPlayer()` is wrapped
+  instead and existing messages come from the view's `_playerToMessage` map.
+
+Each message's player `changed` signal keeps the greyed-out state in sync.
+The OSD shown by the shortcut also switched signatures in GNOME 49, which is
+handled by checking `Config.PACKAGE_VERSION`. All of this is internal Shell
+API, not a stable public one — `enable()` feature-detects both shapes and
+no-ops with a warning if neither matches.
 
 The keyboard shortcut is registered with `Main.wm.addKeybinding()` and finds
 the current player through the date menu's media section (with a fallback to

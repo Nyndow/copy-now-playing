@@ -35,7 +35,9 @@ gnome-extensions enable copy-now-playing@nyndow.github.io
 Reload GNOME Shell first if it doesn't show up: `Alt+F2` → `r` → `Enter`
 (X11), or log out/in (Wayland).
 
-Tested on GNOME Shell 45, 46, 47.
+Tested on GNOME Shell 46. Declared for 45 through 51; the 48+ code path
+follows GNOME Shell's sources but has not yet been exercised on a real 48+
+session, so reports from those releases are welcome.
 
 ## How it works
 
