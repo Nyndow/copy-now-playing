@@ -1,0 +1,5 @@
+# Compiled at install time (see README)
+copy-now-playing@nyndow.github.io/schemas/gschemas.compiled
+
+# Packaged builds
+*.zip
