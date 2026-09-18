@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="copy-now-playing">
+  <schema id="org.gnome.shell.extensions.copy-now-playing"
+          path="/org/gnome/shell/extensions/copy-now-playing/">
+    <key name="format" type="s">
+      <default>'{artist} - {title}'</default>
+      <summary>Clipboard text format</summary>
+      <description>
+        Template for the copied text. Placeholders: {artist}, {title}, {album}.
+        An empty field is dropped together with the separator next to it.
+      </description>
+    </key>
+    <key name="show-link-button" type="b">
+      <default>false</default>
+      <summary>Show a Copy Link button</summary>
+      <description>
+        Add a second button to the media notification that copies the track's
+        URL, for example a Spotify or YouTube link.
+      </description>
+    </key>
+    <key name="copy-shortcut" type="as">
+      <default>['&lt;Super&gt;&lt;Shift&gt;c']</default>
+      <summary>Copy current track shortcut</summary>
+      <description>
+        Keyboard shortcut that copies the currently playing track without
+        opening the notification list. Empty disables it.
+      </description>
+    </key>
+  </schema>
+</schemalist>
