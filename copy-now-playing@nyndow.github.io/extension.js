@@ -36,7 +36,6 @@ export default class CopyNowPlayingExtension extends Extension {
         this._patchedMessages = new Set();
         this._originalUpdate = null;
         this._originalAddPlayer = null;
-        this._keybindingAdded = false;
 
         this._installMessageHooks();
 
@@ -49,13 +48,10 @@ export default class CopyNowPlayingExtension extends Extension {
             Meta.KeyBindingFlags.NONE,
             Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW | Shell.ActionMode.POPUP,
             () => this._copyCurrentTrack());
-        this._keybindingAdded = true;
     }
 
     disable() {
-        if (this._keybindingAdded)
-            Main.wm.removeKeybinding(SHORTCUT_KEY);
-        this._keybindingAdded = false;
+        Main.wm.removeKeybinding(SHORTCUT_KEY);
 
         if (this._originalUpdate)
             Mpris.MediaMessage.prototype._update = this._originalUpdate;
@@ -65,13 +61,11 @@ export default class CopyNowPlayingExtension extends Extension {
             MessageList.MessageView.prototype._addPlayer = this._originalAddPlayer;
         this._originalAddPlayer = null;
 
-        for (const message of this._patchedMessages ?? [])
+        for (const message of this._patchedMessages)
             this._releaseMessage(message);
-        this._patchedMessages?.clear();
         this._patchedMessages = null;
 
-        if (this._settingsChangedId)
-            this._settings.disconnect(this._settingsChangedId);
+        this._settings.disconnect(this._settingsChangedId);
         this._settingsChangedId = 0;
         this._settings = null;
     }
@@ -79,66 +73,41 @@ export default class CopyNowPlayingExtension extends Extension {
     // --- Finding media messages ------------------------------------------
     //
     // GNOME 45-47 export Mpris.MediaMessage, so its _update() can be wrapped.
-    // GNOME 48+ moved MediaMessage into messageList.js without exporting it;
-    // there the exported MessageView builds one per player in _addPlayer(),
-    // so that is wrapped instead. Both paths feed _syncMessage().
+    // GNOME 48+ moved MediaMessage into messageList.js; there MessageView
+    // builds one per player in _addPlayer(), so that is wrapped instead.
+    // Both paths feed _syncMessage().
 
     _installMessageHooks() {
         const extension = this;
 
-        const legacyProto = Mpris.MediaMessage?.prototype;
-        if (typeof legacyProto?._update === 'function' &&
-            typeof legacyProto.addMediaControl === 'function') {
-            this._originalUpdate = legacyProto._update;
-            const originalUpdate = this._originalUpdate;
-            legacyProto._update = function () {
-                originalUpdate.call(this);
-                extension._syncMessage(this);
-            };
-            this._syncExistingMessages();
-            return;
-        }
-
-        const viewProto = MessageList.MessageView?.prototype;
-        if (typeof viewProto?._addPlayer === 'function') {
+        if (SHELL_MAJOR >= 48) {
+            const viewProto = MessageList.MessageView.prototype;
             this._originalAddPlayer = viewProto._addPlayer;
             const originalAddPlayer = this._originalAddPlayer;
             viewProto._addPlayer = function (player) {
                 originalAddPlayer.call(this, player);
-                const message = this._playerToMessage?.get(player);
-                if (message)
-                    extension._syncMessage(message);
+                extension._syncMessage(this._playerToMessage.get(player));
             };
-            this._syncExistingMessages();
-            return;
+        } else {
+            const messageProto = Mpris.MediaMessage.prototype;
+            this._originalUpdate = messageProto._update;
+            const originalUpdate = this._originalUpdate;
+            messageProto._update = function () {
+                originalUpdate.call(this);
+                extension._syncMessage(this);
+            };
         }
 
-        console.warn(
-            `[${this.metadata.name}] GNOME Shell's media message API does ` +
-            'not look like any shape this extension expects (tested against ' +
-            'GNOME Shell 45-51). Skipping the notification button instead of ' +
-            'risking a crash; the keyboard shortcut still works if the ' +
-            'player list can be found.');
+        for (const message of this._existingMessages())
+            this._syncMessage(message);
     }
 
     /** Messages already on screen when the extension gets enabled. */
     _existingMessages() {
-        const messageList = Main.panel.statusArea.dateMenu?._messageList;
-
-        const playerToMessage = messageList?._messageView?._playerToMessage; // 48+
-        if (playerToMessage instanceof Map)
-            return [...playerToMessage.values()];
-
-        const sectionMessages = messageList?._mediaSection?._messages; // 45-47
-        if (Array.isArray(sectionMessages))
-            return sectionMessages.filter(m => m?._player);
-
-        return [];
-    }
-
-    _syncExistingMessages() {
-        for (const message of this._existingMessages())
-            this._syncMessage(message);
+        const messageList = Main.panel.statusArea.dateMenu._messageList;
+        if (SHELL_MAJOR >= 48)
+            return [...messageList._messageView._playerToMessage.values()];
+        return messageList._mediaSection._messages;
     }
 
     // --- Media notification buttons -------------------------------------
@@ -149,9 +118,6 @@ export default class CopyNowPlayingExtension extends Extension {
      * setting flips, and grey them out when there is nothing to copy.
      */
     _syncMessage(message) {
-        if (typeof message?.addMediaControl !== 'function' || !message._player)
-            return;
-
         if (!this._patchedMessages.has(message)) {
             this._patchedMessages.add(message);
             message._copyDestroyId = message.connect('destroy',
@@ -188,17 +154,15 @@ export default class CopyNowPlayingExtension extends Extension {
             if (button)
                 this._cancelCopyReset(button);
         }
-        message._player?.disconnectObject(this);
-        this._patchedMessages?.delete(message);
+        message._player.disconnectObject(this);
+        this._patchedMessages.delete(message);
     }
 
     /** The extension is being disabled: put the message back as it was. */
     _releaseMessage(message) {
-        if (message._copyDestroyId) {
-            message.disconnect(message._copyDestroyId);
-            delete message._copyDestroyId;
-        }
-        message._player?.disconnectObject(this);
+        message.disconnect(message._copyDestroyId);
+        delete message._copyDestroyId;
+        message._player.disconnectObject(this);
         this._destroyButton(message, '_copyButton');
         this._destroyButton(message, '_linkButton');
     }
@@ -208,7 +172,7 @@ export default class CopyNowPlayingExtension extends Extension {
         if (!button)
             return;
         this._cancelCopyReset(button);
-        button.child?.remove_all_transitions();
+        button.child.remove_all_transitions();
         button.destroy();
         delete message[prop];
     }
@@ -293,19 +257,10 @@ export default class CopyNowPlayingExtension extends Extension {
     }
 
     _players() {
-        const messageList = Main.panel.statusArea.dateMenu?._messageList;
-        const candidates = [
-            messageList?._messageView?._mediaSource?.players, // GNOME 48+
-            messageList?._mediaSection?._players,             // GNOME 45-47
-        ];
-        for (const candidate of candidates) {
-            if (Array.isArray(candidate))
-                return candidate;
-            if (candidate instanceof Map)
-                return [...candidate.values()];
-        }
-        // Fall back to the players behind the messages we have patched
-        return [...this._patchedMessages].map(m => m._player).filter(Boolean);
+        const messageList = Main.panel.statusArea.dateMenu._messageList;
+        if (SHELL_MAJOR >= 48)
+            return messageList._messageView._mediaSource.players;
+        return [...messageList._mediaSection._players.values()];
     }
 
     _showOsd(iconName, label) {
@@ -319,33 +274,25 @@ export default class CopyNowPlayingExtension extends Extension {
     // --- Track data --------------------------------------------------------
 
     _trackFields(player) {
-        let metadata = {};
-        try {
-            metadata = player?._playerProxy?.Metadata ?? {};
-        } catch {
-            // Proxy gone; treat as no metadata
-        }
+        const metadata = player._playerProxy.Metadata ?? {};
 
         const str = key => {
-            const variant = metadata[key];
-            const value = typeof variant?.deepUnpack === 'function'
-                ? variant.deepUnpack() : variant;
+            const value = metadata[key]?.deepUnpack();
             return typeof value === 'string' ? value.trim() : '';
         };
 
-        const artists = [].concat(player?.trackArtists ?? [])
-            .filter(a => typeof a === 'string' && a.trim() !== '');
+        const artists = player.trackArtists.filter(a => a.trim() !== '');
 
         return {
             artist: artists.join(', ').trim(),
-            title: (player?.trackTitle ?? '').trim(),
+            title: player.trackTitle.trim(),
             album: str('xesam:album'),
             url: str('xesam:url'),
         };
     }
 
     _formatFields(fields) {
-        const template = this._settings?.get_string(FORMAT_KEY) || DEFAULT_FORMAT;
+        const template = this._settings.get_string(FORMAT_KEY) || DEFAULT_FORMAT;
         return formatTrack(template, fields);
     }
 
